@@ -282,7 +282,7 @@ export default function Player() {
         if (startCharIndex >= fullText.length) {
             setIsPlaying(false);
             if (currentPage < scripts.length - 1 && isAutoplay) {
-                setCurrentPage(p => p + 1);
+                setCurrentPage((p: number) => p + 1);
             }
             return;
         }
@@ -302,8 +302,9 @@ export default function Player() {
             rate: speedToUse,
             onDone: () => {
                 if (!isSeekingRef.current && speechStartTime.current) {
+                    const startTime = speechStartTime.current;
                     // Calculate stats for this segment
-                    const timeTaken = (Date.now() - speechStartTime.current) / 1000;
+                    const timeTaken = (Date.now() - startTime) / 1000;
                     const endCharIndex = fullText.length; // Finished
                     const charsPlayed = endCharIndex - speechStartChar.current;
 
@@ -311,14 +312,14 @@ export default function Player() {
                     speechStartTime.current = null;
 
                     // Also complete page duration logic (legacy/fallback)
-                    updatePageDuration((Date.now() - speechStartTime.current) / 1000 * speedToUse);
+                    updatePageDuration((Date.now() - startTime) / 1000 * speedToUse);
 
                     if (currentPage < scripts.length - 1) {
                         if (isAutoplay) {
-                            setCurrentPage(p => p + 1);
+                            setCurrentPage((p: number) => p + 1);
                         } else {
                             setIsPlaying(false);
-                            setCurrentPage(p => p + 1);
+                            setCurrentPage((p: number) => p + 1);
                         }
                     } else {
                         setIsPlaying(false);
@@ -423,7 +424,7 @@ export default function Player() {
                 console.log(`Rewinding to Previous Page. Overflow: ${overflow}, Target: ${targetIndex}`);
 
                 targetPageOffset.current = targetIndex;
-                setCurrentPage(p => p - 1);
+                setCurrentPage((p: number) => p - 1);
 
                 // We don't playFrom here because useEffect(currentPage) will handle it
                 // Just clear seeking flag after a tiny delay to allow render
