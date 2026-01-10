@@ -1,0 +1,7 @@
+.expo/
+node_modules/
+.git/
+*.jks
+*.p12
+*.key
+*.mobileprovision
