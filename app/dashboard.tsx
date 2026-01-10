@@ -1,5 +1,10 @@
 import { useState, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Modal, TextInput, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Modal, TextInput, Alert, Image, BackHandler } from 'react-native';
+
+// ... (existing imports) 
+
+
+
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -147,6 +152,23 @@ export default function Dashboard() {
         if (parts.length === 1) setCurrentFolder(null); // Back to root
         else setCurrentFolder(parts.slice(0, -1).join('/')); // Up one level
     };
+
+    useFocusEffect(
+        useCallback(() => {
+            const onBackPress = () => {
+                if (currentFolder) {
+                    goBack();
+                    return true;
+                }
+                BackHandler.exitApp();
+                return true;
+            };
+
+            const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+            return () => subscription.remove();
+        }, [currentFolder])
+    );
 
     const handleDeleteFolder = async (folderPath: string) => {
         // Determine type based on current view mode
