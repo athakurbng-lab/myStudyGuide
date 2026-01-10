@@ -1,9 +1,10 @@
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BOOKS_DIR = FileSystem.documentDirectory + 'saved_books/';
-const QUIZZES_DIR = FileSystem.documentDirectory + 'saved_quizzes/';
-const SETTINGS_FILE = FileSystem.documentDirectory + 'user_settings.json';
-const FOLDERS_FILE = FileSystem.documentDirectory + 'folders.json';
+const BOOKS_DIR = FileSystemLegacy.documentDirectory + 'saved_books/';
+const QUIZZES_DIR = FileSystemLegacy.documentDirectory + 'saved_quizzes/';
+const SETTINGS_FILE = FileSystemLegacy.documentDirectory + 'user_settings.json';
+const FOLDERS_FILE = FileSystemLegacy.documentDirectory + 'folders.json';
 
 export interface ScriptItem {
     script: string;
@@ -35,22 +36,24 @@ export interface Folder {
     type: 'BOOK' | 'QUIZ';
 }
 
-export const initStorage = async () => {
-    const dirInfo = await FileSystem.getInfoAsync(BOOKS_DIR);
+// Helper to ensure directory exists
+const ensureDirExists = async (dir: string) => {
+    const dirInfo = await FileSystemLegacy.getInfoAsync(dir);
     if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(BOOKS_DIR, { intermediates: true });
+        await FileSystemLegacy.makeDirectoryAsync(dir, { intermediates: true });
     }
-    const qDir = await FileSystem.getInfoAsync(QUIZZES_DIR);
-    if (!qDir.exists) {
-        await FileSystem.makeDirectoryAsync(QUIZZES_DIR, { intermediates: true });
-    }
+};
+
+export const initStorage = async () => {
+    await ensureDirExists(BOOKS_DIR);
+    await ensureDirExists(QUIZZES_DIR);
 };
 
 export const updateUserSettings = async (updates: Partial<UserSettings>) => {
     try {
         const current = await getGlobalStats() || { lastEstimatedCharRate: 15 };
         const newSettings = { ...current, ...updates };
-        await FileSystem.writeAsStringAsync(SETTINGS_FILE, JSON.stringify(newSettings));
+        await FileSystemLegacy.writeAsStringAsync(SETTINGS_FILE, JSON.stringify(newSettings));
     } catch (e) {
         console.warn("Failed to update user settings", e);
     }
@@ -62,9 +65,9 @@ export const saveGlobalStats = async (rate: number) => {
 
 export const getGlobalStats = async (): Promise<UserSettings | null> => {
     try {
-        const info = await FileSystem.getInfoAsync(SETTINGS_FILE);
+        const info = await FileSystemLegacy.getInfoAsync(SETTINGS_FILE);
         if (!info.exists) return null;
-        const content = await FileSystem.readAsStringAsync(SETTINGS_FILE);
+        const content = await FileSystemLegacy.readAsStringAsync(SETTINGS_FILE);
         return JSON.parse(content);
     } catch (e) {
         return null;
@@ -76,16 +79,16 @@ export const getGlobalStats = async (): Promise<UserSettings | null> => {
 // Internal helper to get raw folders with migration
 const getRawFolders = async (): Promise<Folder[]> => {
     try {
-        const info = await FileSystem.getInfoAsync(FOLDERS_FILE);
+        const info = await FileSystemLegacy.getInfoAsync(FOLDERS_FILE);
         if (!info.exists) return [];
-        const content = await FileSystem.readAsStringAsync(FOLDERS_FILE);
+        const content = await FileSystemLegacy.readAsStringAsync(FOLDERS_FILE);
         const parsed = JSON.parse(content);
 
         // Migration: If string array, convert to BOOK folders
         if (parsed.length > 0 && typeof parsed[0] === 'string') {
             const migrated: Folder[] = parsed.map((p: string) => ({ path: p, type: 'BOOK' }));
             // Save immediately
-            await FileSystem.writeAsStringAsync(FOLDERS_FILE, JSON.stringify(migrated));
+            await FileSystemLegacy.writeAsStringAsync(FOLDERS_FILE, JSON.stringify(migrated));
             return migrated;
         }
 
@@ -104,15 +107,12 @@ export const getFolders = async (type?: 'BOOK' | 'QUIZ'): Promise<string[]> => {
 export const createFolder = async (folderPath: string, type: 'BOOK' | 'QUIZ') => {
     try {
         const folders = await getRawFolders();
-        // Check for duplicate path AND type ?? Just path uniqueness within type?
-        // Let's enforce global uniqueness for simplicity or per type?
-        // Per type is better functionality "Math" in Books and "Math" in Quizzes.
 
         const exists = folders.some(f => f.path === folderPath && f.type === type);
 
         if (!exists) {
             folders.push({ path: folderPath, type });
-            await FileSystem.writeAsStringAsync(FOLDERS_FILE, JSON.stringify(folders));
+            await FileSystemLegacy.writeAsStringAsync(FOLDERS_FILE, JSON.stringify(folders));
         }
     } catch (e) {
         console.error("Failed to create folder", e);
@@ -133,7 +133,7 @@ export const deleteFolder = async (folderPath: string, type: 'BOOK' | 'QUIZ') =>
             return true;
         });
 
-        await FileSystem.writeAsStringAsync(FOLDERS_FILE, JSON.stringify(newFolders));
+        await FileSystemLegacy.writeAsStringAsync(FOLDERS_FILE, JSON.stringify(newFolders));
 
         // Cleanup Items: Move to Root
         if (type === 'BOOK') {
@@ -154,11 +154,11 @@ export const deleteFolder = async (folderPath: string, type: 'BOOK' | 'QUIZ') =>
 export const moveBookToFolder = async (id: string, folder: string) => {
     try {
         const filename = BOOKS_DIR + id + '.json';
-        const content = await FileSystem.readAsStringAsync(filename);
+        const content = await FileSystemLegacy.readAsStringAsync(filename);
         const book: SavedBook = JSON.parse(content);
         if (folder === "") delete book.folder;
         else book.folder = folder;
-        await FileSystem.writeAsStringAsync(filename, JSON.stringify(book));
+        await FileSystemLegacy.writeAsStringAsync(filename, JSON.stringify(book));
     } catch (e) {
         console.error("Failed to move book", e);
     }
@@ -167,11 +167,11 @@ export const moveBookToFolder = async (id: string, folder: string) => {
 export const moveQuizToFolder = async (id: string, folder: string) => {
     try {
         const filename = QUIZZES_DIR + id + '.json';
-        const content = await FileSystem.readAsStringAsync(filename);
+        const content = await FileSystemLegacy.readAsStringAsync(filename);
         const quiz: SavedQuiz = JSON.parse(content);
         if (folder === "") delete quiz.folder;
         else quiz.folder = folder;
-        await FileSystem.writeAsStringAsync(filename, JSON.stringify(quiz));
+        await FileSystemLegacy.writeAsStringAsync(filename, JSON.stringify(quiz));
     } catch (e) {
         console.error("Failed to move quiz", e);
     }
@@ -194,18 +194,18 @@ export const saveBook = async (title: string, scripts: ScriptItem[], existingId?
         date: new Date().toISOString(),
         scripts
     };
-    await FileSystem.writeAsStringAsync(filename, JSON.stringify(bookData));
+    await FileSystemLegacy.writeAsStringAsync(filename, JSON.stringify(bookData));
     return id;
 };
 
 export const getSavedBooks = async (): Promise<SavedBook[]> => {
     await initStorage();
-    const files = await FileSystem.readDirectoryAsync(BOOKS_DIR);
+    const files = await FileSystemLegacy.readDirectoryAsync(BOOKS_DIR);
     const books: SavedBook[] = [];
     for (const file of files) {
         if (file.endsWith('.json')) {
             try {
-                const content = await FileSystem.readAsStringAsync(BOOKS_DIR + file);
+                const content = await FileSystemLegacy.readAsStringAsync(BOOKS_DIR + file);
                 books.push(JSON.parse(content));
             } catch (e) {
                 console.warn("Failed to parse book file", file, e);
@@ -216,18 +216,18 @@ export const getSavedBooks = async (): Promise<SavedBook[]> => {
 };
 
 export const deleteBook = async (id: string) => {
-    await FileSystem.deleteAsync(BOOKS_DIR + id + '.json');
+    await FileSystemLegacy.deleteAsync(BOOKS_DIR + id + '.json');
 };
 
 export const updateBookProgress = async (id: string, pageIndex: number, progress: number) => {
     try {
         const filename = BOOKS_DIR + id + '.json';
-        const fileInfo = await FileSystem.getInfoAsync(filename);
+        const fileInfo = await FileSystemLegacy.getInfoAsync(filename);
         if (!fileInfo.exists) return;
-        const content = await FileSystem.readAsStringAsync(filename);
+        const content = await FileSystemLegacy.readAsStringAsync(filename);
         const book: SavedBook = JSON.parse(content);
         book.lastPosition = { pageIndex, progress };
-        await FileSystem.writeAsStringAsync(filename, JSON.stringify(book));
+        await FileSystemLegacy.writeAsStringAsync(filename, JSON.stringify(book));
     } catch (e) {
         console.warn("Failed to update book progress", e);
     }
@@ -236,12 +236,12 @@ export const updateBookProgress = async (id: string, pageIndex: number, progress
 export const renameBook = async (id: string, newTitle: string) => {
     try {
         const filename = BOOKS_DIR + id + '.json';
-        const fileInfo = await FileSystem.getInfoAsync(filename);
+        const fileInfo = await FileSystemLegacy.getInfoAsync(filename);
         if (!fileInfo.exists) return; // Silent fail
-        const content = await FileSystem.readAsStringAsync(filename);
+        const content = await FileSystemLegacy.readAsStringAsync(filename);
         const book: SavedBook = JSON.parse(content);
         book.title = newTitle;
-        await FileSystem.writeAsStringAsync(filename, JSON.stringify(book));
+        await FileSystemLegacy.writeAsStringAsync(filename, JSON.stringify(book));
     } catch (e) {
         console.error("Failed to rename book", e);
     }
@@ -276,9 +276,9 @@ export interface SavedQuiz {
 }
 
 const initQuizStorage = async () => {
-    const dirInfo = await FileSystem.getInfoAsync(QUIZZES_DIR);
+    const dirInfo = await FileSystemLegacy.getInfoAsync(QUIZZES_DIR);
     if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(QUIZZES_DIR, { intermediates: true });
+        await FileSystemLegacy.makeDirectoryAsync(QUIZZES_DIR, { intermediates: true });
     }
 };
 
@@ -289,18 +289,18 @@ export const saveQuiz = async (quiz: Omit<SavedQuiz, 'date'>): Promise<string> =
         date: new Date().toISOString()
     };
     const filename = QUIZZES_DIR + quiz.id + '.json';
-    await FileSystem.writeAsStringAsync(filename, JSON.stringify(fullQuiz));
+    await FileSystemLegacy.writeAsStringAsync(filename, JSON.stringify(fullQuiz));
     return quiz.id;
 };
 
 export const getSavedQuizzes = async (): Promise<SavedQuiz[]> => {
     await initQuizStorage();
-    const files = await FileSystem.readDirectoryAsync(QUIZZES_DIR);
+    const files = await FileSystemLegacy.readDirectoryAsync(QUIZZES_DIR);
     const quizzes: SavedQuiz[] = [];
     for (const file of files) {
         if (file.endsWith('.json')) {
             try {
-                const content = await FileSystem.readAsStringAsync(QUIZZES_DIR + file);
+                const content = await FileSystemLegacy.readAsStringAsync(QUIZZES_DIR + file);
                 quizzes.push(JSON.parse(content));
             } catch (e) {
                 console.warn("Failed to parse quiz file", file, e);
@@ -313,7 +313,7 @@ export const getSavedQuizzes = async (): Promise<SavedQuiz[]> => {
 export const updateQuizProgress = async (id: string, answers: { [key: string]: string }, isSubmitted: boolean, score?: number, newCommitted?: { [key: string]: string }, analysisReport?: string, analysisMeta?: { questionCount: number; analyzedQuestionIds?: string[] }) => {
     try {
         const filename = QUIZZES_DIR + id + '.json';
-        const content = await FileSystem.readAsStringAsync(filename);
+        const content = await FileSystemLegacy.readAsStringAsync(filename);
         const quiz: SavedQuiz = JSON.parse(content);
 
         quiz.userAnswers = answers;
@@ -331,7 +331,7 @@ export const updateQuizProgress = async (id: string, answers: { [key: string]: s
             quiz.analysisMeta = { ...analysisMeta, timestamp: Date.now() };
         }
 
-        await FileSystem.writeAsStringAsync(filename, JSON.stringify(quiz));
+        await FileSystemLegacy.writeAsStringAsync(filename, JSON.stringify(quiz));
     } catch (e) {
         console.error("Failed to update quiz progress", e);
     }
@@ -340,31 +340,31 @@ export const updateQuizProgress = async (id: string, answers: { [key: string]: s
 export const renameQuiz = async (id: string, newTitle: string) => {
     try {
         const filename = QUIZZES_DIR + id + '.json';
-        const content = await FileSystem.readAsStringAsync(filename);
+        const content = await FileSystemLegacy.readAsStringAsync(filename);
         const quiz: SavedQuiz = JSON.parse(content);
         quiz.source = newTitle; // Resetting source as title? Wait, SavedQuiz doesn't have a separate title field. 'source' is used as title.
 
-        await FileSystem.writeAsStringAsync(filename, JSON.stringify(quiz));
+        await FileSystemLegacy.writeAsStringAsync(filename, JSON.stringify(quiz));
     } catch (e) {
         console.error("Failed to rename quiz", e);
     }
 };
 
 export const deleteQuiz = async (id: string) => {
-    await FileSystem.deleteAsync(QUIZZES_DIR + id + '.json');
+    await FileSystemLegacy.deleteAsync(QUIZZES_DIR + id + '.json');
 }
 
 export const saveQuizAttempt = async (quizId: string, attempt: QuizAttempt) => {
     try {
         const filename = QUIZZES_DIR + quizId + '.json';
-        const content = await FileSystem.readAsStringAsync(filename);
+        const content = await FileSystemLegacy.readAsStringAsync(filename);
         const quiz: SavedQuiz = JSON.parse(content);
 
         // Add to history
         if (!quiz.history) quiz.history = [];
         quiz.history.unshift(attempt); // Newest first
 
-        await FileSystem.writeAsStringAsync(filename, JSON.stringify(quiz));
+        await FileSystemLegacy.writeAsStringAsync(filename, JSON.stringify(quiz));
     } catch (e) {
         console.error("Failed to save quiz attempt", e);
     }
@@ -373,7 +373,7 @@ export const saveQuizAttempt = async (quizId: string, attempt: QuizAttempt) => {
 export const resetQuiz = async (id: string) => {
     try {
         const filename = QUIZZES_DIR + id + '.json';
-        const content = await FileSystem.readAsStringAsync(filename);
+        const content = await FileSystemLegacy.readAsStringAsync(filename);
         const quiz: SavedQuiz = JSON.parse(content);
 
         quiz.userAnswers = {};
@@ -388,7 +388,7 @@ export const resetQuiz = async (id: string) => {
         quiz.shuffleOrder = undefined;
         quiz.shuffledOptions = undefined;
 
-        await FileSystem.writeAsStringAsync(filename, JSON.stringify(quiz));
+        await FileSystemLegacy.writeAsStringAsync(filename, JSON.stringify(quiz));
 
     } catch (e) {
         console.error("Failed to reset quiz", e);
@@ -398,7 +398,7 @@ export const resetQuiz = async (id: string) => {
 export const retakeQuiz = async (id: string) => {
     try {
         const filename = QUIZZES_DIR + id + '.json';
-        const content = await FileSystem.readAsStringAsync(filename);
+        const content = await FileSystemLegacy.readAsStringAsync(filename);
         const quiz: SavedQuiz = JSON.parse(content);
 
         quiz.userAnswers = {};
@@ -413,7 +413,7 @@ export const retakeQuiz = async (id: string) => {
         quiz.shuffleOrder = undefined;
         quiz.shuffledOptions = undefined;
 
-        await FileSystem.writeAsStringAsync(filename, JSON.stringify(quiz));
+        await FileSystemLegacy.writeAsStringAsync(filename, JSON.stringify(quiz));
     } catch (e) {
         console.error("Failed to retake quiz", e);
     }
