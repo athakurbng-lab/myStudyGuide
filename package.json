@@ -15,7 +15,7 @@
     "@types/react": "~19.1.10",
     "babel-preset-expo": "~54.0.9",
     "date-fns": "^4.1.0",
-    "expo": "~54.0.30",
+    "expo": "~54.0.31",
     "expo-auth-session": "~7.0.10",
     "expo-av": "~16.0.8",
     "expo-constants": "~18.0.12",
