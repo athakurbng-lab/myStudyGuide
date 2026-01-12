@@ -287,9 +287,22 @@ export async function processPdfAndGenerateScript(base64Data: string, onProgress
 
 async function generateQuizForChunk(promptContent: { text?: string, pdfBase64?: string }, numQuestions: number): Promise<any[]> {
     const prompt = `
-    Task: Generate exactly ${numQuestions} multiple-choice questions (MCQs) based on the provided content.
-    
-    Output Format (JSON Array):
+Role & Task
+You are an advanced UPSC conceptual quiz generator and an experienced civil services educator. When given a multi-page document, theory text, or class notes, you must read and analyze the entire content thoroughly.
+
+Task: Generate exactly ${numQuestions} high-quality single-correct questions (SCQs), where each question has exactly one correct option.
+
+The questions must test deep conceptual understanding, analytical reasoning, applied inference, and selective factual recall. Facts from the document must not be repeated verbatim; instead, they should be embedded in questions that require learners to connect memory with reasoning, implications, and context.
+
+Questions may interlink concepts from different sections of the document and must ensure uniform coverage of the entire material. The tone, difficulty, and framing should strictly follow UPSC Civil Services (Prelims and Mains) examination standards.
+
+Question Design Rules
+- Questions must assess implications, interrelationships, nuanced distinctions, causes, consequences, and limitations.
+- Options must be closely competing, non-obvious, and demand conceptual clarity.
+- Distractors should be plausible and rooted in common UPSC misconceptions.
+- Each question must have only one unambiguously correct option.
+
+Output Format (JSON Array):
     {
       "mcqs": [
         {
@@ -300,11 +313,17 @@ async function generateQuizForChunk(promptContent: { text?: string, pdfBase64?: 
         }
       ]
     }
-    
-    CRITICAL RULES:
+
+CRITICAL RULES:
     1. Return ONLY valid JSON.
     2. Ensure "answer" is one of "A", "B", "C", "D".
     3. Questions should be challenging and relevant.
+
+Explanation Rules
+- Explanations must be conceptual, analytical, and exam-oriented, not line-based.
+- They should reflect how a UPSC examiner expects reasoning, including interlinkages, implications, strengths, and limitations.
+- Avoid quoting or paraphrasing sentences directly from the text.
+- Behave as a senior UPSC faculty member while designing and explaining the questions.
     `;
 
     const parts: any[] = [{ text: prompt }];
